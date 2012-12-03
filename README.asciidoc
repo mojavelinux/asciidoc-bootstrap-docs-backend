@@ -23,3 +23,8 @@ If you enable the link-assets attribute, then you should also checkout (or symli
 
 Use the 'bootstrap-docs' backend as you would the built-in backends.
 
+== Example
+
+As you would expect, the rendered output looks shockingly similar to the Twitter Bootstrap documentation.
+
+Compare the original http://twitter.github.com/bootstrap/base-css.html[Base CSS] chapter with the http://cloud.github.com/downloads/mojavelinux/asciidoc-bootstrap-docs-backend/example.html[HTML output] from this https://raw.github.com/mojavelinux/asciidoc-bootstrap-docs-backend/master/examples/base-css-book.asciidoc[AsciiDoc source]. Hey Twitter, want to switch to AsciiDoc?
