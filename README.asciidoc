@@ -1,0 +1,25 @@
+= bootstrap docs backend for AsciiDoc
+
+An AsciiDoc backend that renders the AsciiDoc source as HTML5 in the style of the http://twitter.github.com/bootstrap[Twitter Bootstrap docs].
+
+== Installation
+
+To install the bootstrap docs backend, download https://github.com/downloads/mojavelinux/asciidoc-bootstrap-docs-backend/bootstrap-docs.zip[bootstrap-docs.zip] and install it using the asciidoc command (you will need AsciiDoc version 8.6.6 or newer):
+
+----
+asciidoc --backend install bootstrap-docs.zip
+----
+
+Next, checkout the Twitter Bootstrap repositor in the backend folder:
+
+----
+cd ~/.asciidoc/backends/bootstrap-docs
+git clone git://github.com/twitter/bootstrap.git
+----
+
+If you enable the link-assets attribute, then you should also checkout (or symlink) the bootstrap clone in the same directory as the rendered file. You also need to create a symlink to asciidoc.js included in this backend.
+
+== Usage
+
+Use the 'bootstrap-docs' backend as you would the built-in backends.
+

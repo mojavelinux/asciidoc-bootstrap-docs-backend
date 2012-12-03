@@ -1,0 +1,2 @@
+- use jQuery for toc
+- figure out how to remove endlines in base64.encode w/o having to use sed
