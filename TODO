@@ -1,2 +1,7 @@
+- add support for picking up a -navinfo.(xml|html) file for the navigation like the docinfo
+- use http://fortawesome.github.com/Font-Awesome/ instead of glyphicons
+- make prettyprint optional
+- make Example callout optional
+- multi-line admonition
 - use jQuery for toc
 - figure out how to remove endlines in base64.encode w/o having to use sed
