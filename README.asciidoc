@@ -6,9 +6,7 @@ An AsciiDoc backend that renders the AsciiDoc source as HTML5 in the style of th
 
 To install the bootstrap docs backend, download https://github.com/downloads/mojavelinux/asciidoc-bootstrap-docs-backend/bootstrap-docs.zip[bootstrap-docs.zip] and install it using the asciidoc command (you will need AsciiDoc version 8.6.6 or newer):
 
-----
-asciidoc --backend install bootstrap-docs.zip
-----
+ asciidoc --backend install bootstrap-docs.zip
 
 Next, checkout the Twitter Bootstrap repositor in the backend folder:
 
