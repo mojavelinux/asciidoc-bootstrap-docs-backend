@@ -1,4 +1,4 @@
-= bootstrap docs backend for AsciiDoc
+= Bootstrap documentation-style backend for AsciiDoc
 
 An AsciiDoc backend that renders the AsciiDoc source as HTML5 in the style of the http://twitter.github.com/bootstrap[Twitter Bootstrap docs].
 
