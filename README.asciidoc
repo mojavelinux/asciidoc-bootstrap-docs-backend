@@ -10,10 +10,8 @@ To install the bootstrap docs backend, download https://github.com/downloads/moj
 
 Next, checkout the Twitter Bootstrap repositor in the backend folder:
 
-....
-cd ~/.asciidoc/backends/bootstrap-docs
-git clone git://github.com/twitter/bootstrap.git
-....
+ cd ~/.asciidoc/backends/bootstrap-docs
+ git clone git://github.com/twitter/bootstrap.git
 
 If you enable the link-assets attribute, then you should also checkout (or symlink) the bootstrap clone in the same directory as the rendered file. You also need to create a symlink to asciidoc.js included in this backend.
 
