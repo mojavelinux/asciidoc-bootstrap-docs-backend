@@ -1,0 +1,1082 @@
+//
+// Export Commands
+// ===============
+// to HTML5:
+// asciidoc -b html5 -a icons -a theme=default -a data-uri -a toc2 -a pygments -f javaeeworkshop.conf javaeeworkshop.asciidoc
+//
+// to DocBook:
+// asciidoc -b docbook -dbook -f javaeeworkshop.conf javaeeworkshop.asciidoc
+//
+// to PDF (using fop):
+// a2x -fpdf -dbook --fop --icons --icons-dir=$HOME/.asciidoc/themes/default/icons -f javaeeworkshop.conf javaeeworkshop.asciidoc
+//
+JBoss Java EE 6 Workshop
+========================
+Dan Allen <dan.j.allen@gmail.com>
+v1.2.0, May 30, 2012 : Drop Express from OpenShift Express, local AS 7 deployment
+:Author Initials: DJA
+:description: Creating, testing and deploying an application using the JBoss Java EE tools and runtimes.
+:brand: JBoss
+:doctype: book
+:toc:
+:backend: bootstrap-docs
+:link-assets:
+:openshift:             http://openshift.com
+:openshiftdashboard:    https://openshift.redhat.com/app/console/applications
+:installingclienttools: https://redhat.com/openshift/community/kb/kb-e1000/installing-openshift-express-client-tools-on-non-rpm-based-systems
+:jbossforge:            http://jboss.org/forge
+:jbossforgedownload:    link:$$https://repository.jboss.org/nexus/index.html#nexus-search;gav~org.jboss.forge~forge-distribution~~~~kw,versionexpand$$
+:jbossas7download:      http://jboss.org/as7
+
+[role="lead"]
+This tutorial steps through creating, testing and deploying an application using the JBoss Java EE tools and runtimes. You can show up with nothing but Java and a passion to learn. By the end, you'll have a full application running in the cloud provided by OpenShift.
+
+Here's the development stack we'll be using:
+
+* OpenShift
+* git
+* JBoss Forge
+* JBoss Tools
+* JBoss AS 7
+* Arquillian
+
+Hang on, cause it's going to move 'fast!'
+
+= OpenShift Introduction
+
+== Why Java EE on OpenShift?
+
+You've probably been hearing a lot about cloud (``to the cloud!''). But, if you're like me, you just haven't been that motivated to try it, or it just seemed like too much effort. After all, taking a Java EE application to the cloud typically meant:
+
+* Breaking out a credit card (I hate being restricted from exploring)
+* Implementing tons of hacks to get a Java EE application running on a cloud provider
+* Not knowing how Java EE development is even compatible with cloud
+* Lack of crystal clear documentation and examples
+
+'All that has changed'. I assure you, you're in for a pleasant surprise.
+
+{openshift}[OpenShift] provides a free, cloud-based application platform for Java, Perl, PHP, Python, and Ruby applications using a shared-hosting model. Exploring the cloud has never been simpler. You can deploy a Java EE compliant application without requiring any hacks or workarounds. Best of all, take as much time as you like, because it's all 'free'. (Oh, and you can show off your applications to your friends, or even run applications for your own purposes).
+
+It's time to get going!
+
+== Creating an OpenShift account
+
+Creating an OpenShift account is very straightforward.
+
+. Go to the {openshift}[OpenShift homepage]
+. Click on the "Signup and try it" button to open the registration form
+. Enter a valid email address, a password (twice) and pass the Captcha (I know, it's tough)
+. Check your email and follow instructions in the welcome email
+
+Welcome to OpenShift!
+
+== Installing Ruby-based OpenShift client tools
+
+To interact with the OpenShift Platform-as-a-Service (PaaS), you'll need one of the available OpenShift client tools installed. We'll be using the Ruby-based commandline tool, rhc, in this tutorial.
+
+To install the Ruby-based OpenShift client tools, you first need to install git and Ruby Gems.
+
+On a Debian-based Linux distribution, it's as easy as:
+
+[listing]
+$> sudo apt-get install ruby rubygems
+
+On a rpm-based Linux distribution, it's as easy as:
+
+[listing]
+$> sudo yum install ruby rubygems
+
+Next, install the Red Hat Cloud (rhc) gem:
+
+[listing]
+$> sudo gem install rhc
+
+This will add a set of commands to your shell prefixed with rhc- (e.g., rhc-create-domain).
+
+[name="info"]
+TIP: On some distributions the gem installation directory is not automatically added to the path. Find the location of your gems with gem environment and add it to you system's PATH environment variable.
+
+For more information see {installingclienttools}[Installing OpenShift client tools on Linux, Windows and Mac OSX].
+
+== Creating a domain for your applications
+
+Before actually deploying an app to OpenShift, you first need to create a domain. A domain hosts one or more applications. The name of the domain will be used in the URL of your apps according to the following scheme:
+
+[role="text-info"]
+[icon-hand-right]#{empty}# +++http://[application name]-[domain name].rhcloud.com+++
+
+Create a domain using the following command:
+
+[listing]
+$> rhc-create-domain -n [domain name] -l [openshift email]
+
+NOTE: Use the same email address you used to register for your OpenShift account and enter your OpenShift password when prompted.
+
+[name="info"]
+TIP: All OpenShift client tools prompt you for your OpenShift password (unless you supply it using the -p command flag)
+
+The command will then create a pair of private and public keys as 'libra_id_rsa' and 'libra_id_rsa.pub' in your '$HOME/.ssh/' directory. It will ask you for a password to access the private key. *Don't forget it!*
+
+[name="info"]
+TIP: If you want to use an existing ssh key file, you can specify it explicitly in the '$HOME/.openshift/express.conf' file. You'll also discover that your email is cached in this file, which means you don't have to specify it in subsequent commands.
+
+You can see a summary of your domain using the following command:
+
+[listing]
+$> rhc-domain-info
+
+You can also go to the {openshiftdashboard}[dashboard] to see your newly minted domain. You now have your own, free cloud. Woot!
+
+== Creating your first Java EE application on OpenShift
+
+We now want to create a new application that uses the JBoss AS 7 cartridge. This allows us to deploy Java EE-compliant applications to OpenShift.
+
+We'll assume you'll be developing the application in the following folder: '~/demos/apps/sellmore'
+
+Next, use the following command to create a slot in your OpenShift domain in which to run the application and the location where the local project should be created:
+
+[listing]
+$> rhc-create-app -a sellmore -t jbossas-7 -r ~/demos/apps/sellmore
+
+You'll be prompted for your ssh key password that you created in the previous step.
+
+Behind the scenes, OpenShift has created a git repository for you and cloned it locally. That's how you're going to "push" your application to the cloud. The cloned repository contains a Maven-based project structure (which you don't have to use):
+
+.Project layout
+----
+sellmore
+|- .git/
+|- .openshift/
+|- deployments/
+|- src/
+|- .gitignore
+|- pom.xml
+`- README
+----
+
+The 'README' describes all the special directories that pertain to OpenShift.
+
+The OpenShift setup leaves behind a sample application which is going to get in our way later on. So first, let's clear the path:
+
+----
+$> cd sellmore
+$> git rm -r pom.xml src
+$> git commit -m 'clear a path'
+$> cd ..
+----
+
+If you're working with another origin git repository (such as on github), we recommend renaming the OpenShift repository from origin to openshift:
+
+----
+$> cd sellmore
+$> git remote rename origin openshift
+$> cd ..
+----
+
+That separates the concern of managing your source code repository from deploying files to OpenShift.
+
+You can see a summary of your application configuration using the following command:
+
+[listing]
+$> rhc-domain-info
+
+You can also go to the {openshiftdashboard}[dashboard] to see your application slot. If you click on the URL, you'll see that a sample application is already running in the cloud. We'll be replacing that soon enough.
+
+If, for whatever reason, you need to delete your application, use this command:
+
+[listing]
+$> rhc-ctl-app -a sellmore -c destroy
+
+You'll also want to delete your local .git repository (unless you mean to save it).
+
+But now's not the time to delete, it's time to create!
+
+= JBoss Forge Introduction
+
+== Why JBoss Forge?
+
+Because starting a project is hard. It doesn't just take time, it takes mental energy. We want to save that energy for creating useful things. Trust me, even if copying and pasting 20 lines of build XML seems easy, somewhere along the line your going to find yourself roasting your brain. Let's toss the complexity over the wall and let a tool like Forge deal with it.
+
+Forge is your monkey, or 10,000 of them.
+
+== Setting up Forge
+
+To create our application, we're going to use {jbossforge}[JBoss Forge]. Forge is a plugin-based framework for rapid development of standards-based Java applications.
+
+Begin by grabbing Forge from the {jbossforgedownload}[download area]. Then, unpack the distribution:
+
+[listing]
+$> unzip forge-distribution-1.0.0.Beta5.zip
+
+Move the extracted folder to the location of your choice and change into that directory in your console:
+
+[listing]
+$> cd ~/opt/forge
+
+Finally, run Forge:
+
+[listing]
+$> ./bin/forge
+
+To be sure everything is working okay, run the about command in the Forge shell:
+
+----
+$forge> about
+
+  _____                    
+ |  ___|__  _ __ __ _  ___ 
+ | |_ / _ \| `__/ _` |/ _ \  \\
+ |  _| (_) | | | (_| |  __/  //
+ |_|  \___/|_|  \__, |\___| 
+                 |___/      
+
+JBoss Forge, version [ 1.0.2.Final ] - JBoss, by Red Hat, Inc. [ http://jboss.org/forge ]
+----
+
+NOTE: Any command in this document prefixed with `$forge>` is intended to be run in the Forge shell.
+
+Things look good. We're ready to create an application.
+
+== Generating an application with Forge
+
+Forge allows you to create a Java EE application from scratch. We're going to generate a point of sale application step-by-step in the Forge shell using the commands below (make sure Forge is running):
+
+.Forge commands to create a Java EE web project
+----
+new-project; <1>
+
+scaffold setup --scaffoldType faces; <2>
+persistence setup --provider HIBERNATE --container JBOSS_AS7; <3>
+validation setup --provider HIBERNATE_VALIDATOR; <4>
+
+entity --named Customer --package ~.domain; <5>
+field string --named firstName;
+field string --named lastName;
+field temporal --type DATE --named birthDate;
+entity --named Item;
+field string --named name;
+field number --named price --type java.lang.Double;
+field int --named stock;
+cd ..;
+
+entity --named ProductOrder; <6>
+field manyToOne --named customer --fieldType ~.domain.Customer.java --inverseFieldName orders;
+cd ../Customer.java;
+entity --named Profile;
+field string --named bio;
+field string --named preferredName;
+field string --named notes;
+entity --named Address;
+field string --named street;
+field string --named city;
+entity --named ZipCode;
+field int --named code;
+cd ../Address.java;
+
+field manyToOne --named zip --fieldType ~.domain.ZipCode.java; <7>
+cd ..;
+cd Customer.java;
+field manyToMany --named addresses --fieldType ~.domain.Address.java;
+cd ..;
+cd Address.java;
+cd ../Customer.java;
+field oneToOne --named profile --fieldType ~.domain.Profile.java;
+cd ..;
+cd ProductOrder.java;
+field manyToMany --named items --fieldType ~.domain.Item.java;
+cd ..;
+cd ProductOrder.java;
+field manyToOne --named shippingAddress --fieldType ~.domain.Address.java;
+cd ..;
+
+scaffold from-entity ~.domain.* --scaffoldType faces --overwrite; <8>
+cd ~~;
+
+rest setup; <9>
+rest endpoint-from-entity ~.domain.*; <10>
+
+build; <11>
+
+cd ~~; <12>
+echo "Project Info:"; project;
+----
+
+<1> Create a new project in the current directory
+<2> Turn our Java project into a Web project with abbr:JSF[JavaServer Faces], abbr:CDI[Contexts & Dependency Injection], abbr:EJB[Enterprise JavaBeans]
+<3> Setup abbr:JPA[Java Persistence API]
+<4> Setup Bean Validation
+<5> Create some JPA entities on which to base our application
+<6> Create more entities, also add a relationship between Customer and their Orders
+<7> Add more relationships between our entities
+<8> Generate the UI for all of our entities at once
+<9> Setup JAX-RS
+<10> Generate abbr:CRUD[Create, Read, Update & Delete] endpoints
+<11> Build the project
+<12> Return to the project root directory and leave it in your hands
+
+You've got a complete application, ready to deploy!
+
+But wait! That sure seemed like a lot of typing. What's really great about Forge is that it's fine-grained enough to perform simple operations, but it can also compose those operations inside plugins or scripts!
+
+You can take all of those commands and put them into a script ending in .fsh and run the script from the Forge shell.
+
+If you're going to try this approach, you should first wipe the slate clean.
+
+[listing]
+$> rm -Rf src/ pom.xml
+
+Then, copy all the Forge commands listed above into the file generate.fsh at the root of the project.
+
+You may also want to wrap the following two lines around the contents so that the commands run without pausing:
+
+.Use as first line
+----
+set ACCEPT_DEFAULTS true; <1>
+----
+
+<1> Disables interactive commands
+
+.Use as last line
+----
+set ACCEPT_DEFAULTS false; <1>
+----
+
+<1> Reenables interactive commands
+
+You can now build the application using a single command:
+
+[listing]
+$forge> run generate.fsh
+
+Alternatively, you can also run a prepared version of this script directly off the web
+
+[listing]
+$forge> run-url https://raw.github.com/gist/1666087/1cd6032090f66f6aa18b7bd2ce55c569be8ac454/generate.fsh
+
+That's more like it! Now, let's get the application running!
+
+= Application Deployment
+
+== Deploying the application to a local JBoss AS 7 instance
+
+Before we get all cloud happy, it's a good idea to make sure the application runs on our own machine. We want to make sure that we rule out any problems with the application before adding the cloud into the mix.
+
+If you don't have JBoss AS 7 yet, head on over to the {jbossas7download}[JBoss AS 7 download page] and grab the latest 7.1 version. When the download finishes, unpack the distribution
+
+[listing]
+$> unzip jboss-as-7.1.1.Final.zip
+
+Move the extracted folder to the location of your choice (we'll assume it's $HOME/opt/jboss-as) and change into that directory in your console:
+
+[listing]
+$> cd $HOME/opt/jboss-as
+
+Finally, run JBoss AS in standalone (single server) mode:
+
+[listing]
+$> ./bin/standalone.sh
+
+You shouldn't have to wait long to see:
+
+----
+JBoss AS 7.1.1.Final "Brontes" started in 1933ms - Started 133 of 208 services...
+----
+
+Now that's a speedy app server!
+
+Let's head back to Forge so we can give this eager server something to run. We'll start by adding the Maven plugin for JBoss AS 7 to the project (yes, there is a decent Maven plugin finally):
+
+[listing]
+$forge> setup as7
+
+If you don't have the as7 command yet, you can install it using this command, then go back and do the setup:
+
+[listing]
+$forge> forge install-plugin as7
+
+Okay, build the application and send it to JBoss AS:
+
+----
+$forge> build
+$forge> as7 deploy
+----
+
+The first deployment is always the slowest, so give it a few seconds. Then, have a look around the application you generated:
+
+[role="text-info"]
+[icon-hand-right]#{empty}# +++http://localhost:8080/sellmore+++
+
+If everything looks good, then the application is cleared for take off. Let's now do the same deployment, but this time on OpenShift.
+
+== Deploying your first Java EE application to OpenShift
+
+There are two ways to deploy an application to OpenShift:
+
+. *Deploy the source*
++
+You can commit your source files and push them to the remote server using git, at which point the application will be built and deployed on the remote host. Alternatively, you can use a Jenkins slave to handle the build and deploy steps on the server. More on that later.
++
+. *Deploy a package*
++
+You can copy a pre-built war into 'deployments/' (with the corresponding .dodeploy file for an exploded war) and use git to commit and push the file(s) to the remote server for deployment
+
+In the first scenarios, you edit the files locally and let OpenShift build the app using Maven and deploy it to JBoss AS 7 once you push the changes using git. In the second scenario, you build the application locally and just push the final package to OpenShift, which it will deploy to JBoss AS 7.
+
+We're going to take the source route.
+
+First, add the following profile to the end of the pom.xml file (inside the root element):
+
+.pom.xml (fragment)
+----
+<profiles>
+  <profile>
+   <!-- When built in OpenShift the 'openshift' profile will be used when invoking mvn. -->
+   <!-- Use this profile for any OpenShift specific customization your app will need. -->
+   <!-- By default that is to put the resulting archive into the 'deployments' folder. -->
+   <!-- http://maven.apache.org/guides/mini/guide-building-for-different-environments.html -->
+   <id>openshift</id>
+   <build>
+      <finalName>sellmore</finalName>
+      <plugins>
+        <plugin>
+          <artifactId>maven-war-plugin</artifactId>
+          <version>2.1.1</version>
+          <configuration>
+            <outputDirectory>deployments</outputDirectory>
+            <warName>ROOT</warName>
+          </configuration>
+        </plugin>
+      </plugins>
+    </build>
+  </profile>
+</profiles>
+----
+
+IMPORTANT: If you forget this profile, then the application will build on the OpenShift PaaS, but it will not be deployed to JBoss AS 7.
+
+[name="warning"]
+CAUTION: You may want to add the Eclipse project files to '.gitignore' so that they aren't committed.
+
+Next, we'll add all the new files to git, commit them and push them to the server. You can perform these operations directly inside the Forge shell:
+
+----
+$forge> git add pom.xml src
+$forge> git commit -a -m 'new project'
+$forge> git push openshift master
+----
+
+You'll see the OpenShift begin the build lifecycle on the server, which includes executing Maven and downloading the (nearby) internet. The console output you're seeing is from the remote server being echoed into your local console.
+
+== OpenShift Build Lifecycle
+
+The OpenShift build lifecycle comprises four steps:
+
+. *Pre-Receive*
++
+Occurs when you run a git push command, but before the push is fully committed.
++
+. *Build*
++
+Builds your application, downloads required dependencies, executes the '.openshift/action_hooks/build' script and prepares everything for deployment.
++
+. *Deploy*
++
+Performs any required tasks necessary to prepare the application for starting, including running the '.openshift/action_hooks/deploy' script. This step occurs immediately before the application is issued a start command.
++
+. *Post-Deploy*
++
+Allows for interaction with the running application, including running the '.openshift/action_hooks/post_deploy' script. This step occurs immediately after the application is started.
+
+When the build is done, you'll notice that the application is deployed to JBoss AS 7. You can now visit the application URL again to see the application running.
+
+[role="text-info"]
+[icon-hand-right]#{empty}# +++http://sellmore-[domain name].rhcloud.com+++
+
+You should see the Forge welcome page and a list of items in the sidebar you can create, read, update and delete (CRUD).
+
+If you want to push out a new change, simply update a file, then use git to commit and push again:
+
+----
+$forge> git commit -a -m 'first change'
+$forge> git push openshift master
+----
+
+The OpenShift build lifecycle will kick off again. Shortly after it completes, the change will be visible in the application.
+
+= Application Management
+
+== Managing OpenShift applications from a shell environment
+
+OpenShift isn't just a black box (black cloud?), it's Linux and it's open! That means you can shell into your cloud just as you would any (decent) hosting environment.
+
+So what's the login? It's embedded there in the git repository URL. Let's find it.
+
+[listing]
+$> git remote show -n openshift
+
+You can also get the same information using:
+
+[listing]
+$> rhc-domain-info -a
+
+You are looking for the ssh username and host in the form `username@hostname`. Once you've got that, just pass it to ssh and the authentication will be handled by the ssh key you setup earlier. Here's the syntax:
+
+[listing]
+$> ssh [UUID]@[application name]-[domain name].rhcloud.com
+
+There's a lot of power in that shell environment. You can type help to get a list of speciality commands (such as starting, stopping or restarting your app), or use just about any Linux shell command you know. Be sure to pay attention to what you're typing, though rest assured that the box is running on abbr:RHEL[Red Hat Enterprise Linux] secured with SELinux.
+
+== Viewing the log files
+
+There are two ways to view (tail) the log files of your application. You can use the client tool:
+
+[listing]
+$> rhc-tail-files -a sellmore
+
+Or you can shell into the server and use the built-in tail command:
+
+[listing]
+$> tail_all
+
+You can also use the regular tail command in the remote shell environment.
+
+== Restarting or stopping your application
+
+You can control your application directly without pushing files through git. One way is to use the client tool from your location machine:
+
+[listing]
+$> rhc-ctl-app -c restart
+
+You can also shell into your domain and execute a command using one of the special commands provided:
+
+[listing]
+$> ctl_app restart
+
+In addition to restart, you can use the commands start, stop, etc.
+
+= Persistence Storage
+
+== Preserving the database between restarts
+
+You may have noticed that each time we restart the application, the data gets lost. There are two ways to resolve this:
+
+. Update tables rather that dropping and recreating them on deployment
+. Save the data to a safe location on disk
+
+The first setting is a feature of Hibernate (or alternate JPA provider) and is changed using the following property in 'src/main/resources/META-INF/persistence.xml':
+
+.src/main/resources/META-INF/persistence.xml (fragment)
+[listing]
+<property name="hibernate.hbm2ddl.auto" value="update"/>
+
+The second feature depends on the database you are using. If you are using the provided H2 database, you'll likely want to change the configuration in '.openshift/config/standalone.xml' to use the OpenShift data directory:
+
+..openshift/config/standalone.xml (fragment)
+[listing]
+<connection-url>jdbc:h2:${OPENSHIFT_DATA_DIR}/test;DB_CLOSE_DELAY=-1</connection-url>
+
+The other approach is just to use a regular client-server database (e.g., MySQL or PostgreSQL), which we'll do later.
+
+== Persisting data to a MySQL database
+
+OpenShift provides us with several add-on services (cartridges) we can use. To see the list of available cartridges, issue the following command:
+
+----
+$> rhc-ctl-app -a sellmore -L
+
+List of supported embedded cartridges:
+  
+  postgresql-8.4, metrics-0.1, mysql-5.1, jenkins-client-1.4,
+  10gen-mms-agent-0.1, phpmyadmin-3.4, rockmongo-1.1, mongodb-2.0
+----
+
+Oh goody! Lots of options :)
+
+Let's install mysql-5.1 cartridge:
+
+----
+$> rhc-ctl-app -a sellmore -e add-mysql-5.1
+
+Mysql 5.1 database added. Please make note of these credentials:
+  
+   Root User: admin
+   Root Password: xxxxx
+   Database Name: sellmore
+  
+Connection URL: mysql://127.1.47.1:3306/
+
+You can manage your new Mysql database by also embedding phpmyadmin-3.4.
+----
+
+NOTE: The name of the database is the same as the name of the application.
+
+OpenShift is telling us that the phpmyadmin cartridge is also available, so we'll add it as well.
+
+----
+$> rhc-ctl-app -a sellmore -e add-phpmyadmin-3.4
+
+phpMyAdmin 3.4 added. Please make note of these credentials:
+
+   Root User: admin
+   Root Password: xxxxx
+
+URL: https://sellmore-[domain name].rhcloud.com/phpmyadmin/
+----
+
+Open a browser and go to the URL shown, then login as admin with the password reported by the previous command.
+
+[name="warning"]
+CAUTION: It's a good idea to create another user with limited privileges (select, insert, update, delete, create, index and drop) on the same database.
+
+You can also shell into the domain and control MySQL using the MySQL client. You'll need to connect using the hostname provided when you added the cartridge since it's running on a different interface (not through a local socket).
+
+[listing]
+$> mysql -u $OPENSHIFT_DB_USERNAME -p$OPENSHIFT_DB_PASSWORD -h $OPENSHIFT_DB_HOST
+
+Now we'll configure our application to use OpenShift's MySQL database when running in the cloud.
+
+== Switching the application datastore to MySQL
+
+The JBoss AS 7 cartridge comes configured out of the box with datasources for H2 (embedded), MySQL and PostgreSQL. The datasources for MySQL and PostgreSQL are enabled automatically when the respective cartridges are added. You can find this configuration in '.openshift/config/standalone.xml'.
+
+Here's the datasource name that cooresponds to the MySQL connection pool:
+
+====
++++java:jboss/datasources/MysqlDS+++
+====
+
+The connection URL uses values that are automatically populated via environment variables maintained by OpenShift.
+
+====
++++jdbc:mysql://${OPENSHIFT_DB_HOST}:${OPENSHIFT_DB_PORT}/${OPENSHIFT_APP_NAME}+++
+====
+
+All you need to do is open up the 'src/main/resources/META-INF/persistence.xml' and set the JTA datasource:
+
+.src/main/resources/META-INF/persistence.xml (fragment)
+[listing]
+<jta-data-source>java:jboss/datasources/MysqlDS</jta-data-source>
+
+If you want to use PostgreSQL, follow the steps above for setting up MySQL, but replace it with the PostgreSQL cartridge (postgresql-8.4). Then, you'll use this datasource in your persistence.xml:
+
+.src/main/resources/META-INF/persistence.xml (fragment)
+[listing]
+<jta-data-source>java:jboss/datasources/PostgreSQLDS</jta-data-source>
+
+You can connect to the PostgreSQL prompt on the domain using this command:
+
+[listing]
+$> psql -h $OPENSHIFT_DB_HOST -U $OPENSHIFT_DB_USERNAME -d $OPENSHIFT_APP_NAME
+
+= Advanced Deployment
+
+== Building with Jenkins
+
+Jenkins is a continous integration (CI) server. When installed in an OpenShift environment, Jenkins takes over as the build manager for your application. You now have two options for how to build and deploy on OpenShift:
+
+Building without Jenkins::
+    Uses your application space as part of the build and test process. Because of this, the application is stopped to free memory while the build is running.
+
+Building with Jenkins::
+    Uses dedicated application space that can be larger then the application runtime space. Because the build happens in its own dedicated jail, the running application is not shutdown or changed in any way until after the build is a success.
+ 
+Here are the benefits to using Jenkins:
+
+* Archived build information
+* No application downtime during the build process
+* Failed builds do not get deployed (leaving the previous working version in place).
+* Jenkins builders have additional resources like memory and storage
+* A large community of Jenkins plugins (300+)
+
+To enable Jenkins to use with an existing application, you first create a dedicated jenkins application:
+
+[listing]
+$> rhc-create-app -a builds -t jenkins-1.4
+
+Then you add the Jenkins client to your own application:
+
+[listing]
+$> rhc-ctl-app -a sellmore -e add-jenkins-client-1.4
+
+Make a note of the admin account password for Jenkins and point your browser at the following URL:
+
+[role="text-info"]
+[icon-hand-right]#{empty}# +++http://builds-[domain name].rhcloud.com+++
+
+Once you are there, you can click "log in" in the top right of the Jenkins window to sign in and start tweaking the Jenkins configuration.
+
+Now you simply have to do a git push to remote branch and Jenkins will take over building and deploying your application.
+
+The pre-Jenkins way of doing this was to fire off a command line build and dump the output to the screen. You'll notice that this output is replaced with a URL where you can view the output and status of the build.
+
+= Integration Testing
+
+== Writing real cloud tests with Arquillian
+
+Bring your tests to the runtime instead of managing the runtime from your test. Isn't the cloud one of those runtimes? It sure is!
+
+Let's use Arquillian to write some tests that run on a local JBoss AS instance. Later, we'll get them running on OpenShift.
+
+Setting up Arquillian requires thought. Let's put those 10,000 monkeys to work again. Open up Forge and see if it can find a plugin to help us get started with Arquillian.
+
+----
+$forge> forge find-plugin arquillian
+----
+
+Sure enough, there it is!
+
+----
+- arquillian (org.arquillian.forge:arquillian-plugin:::1.0.0-SNAPSHOT)
+       Author: Paul Bakker <paul.bakker.nl@gmail.com>
+       Website: http://www.jboss.org/arquillian
+       Location: git://github.com/forge/plugin-arquillian.git
+       Tags: arquillian, jboss, testing, junit, testng, integration testing, tests, CDI, java ee
+       Description: Integration Testing Framework
+----
+ 
+Let's snag it.
+
+----
+$forge> forge install-plugin arquillian
+----
+
+That will clone the plugin source, build it and install it into the Forge shell. Once it's finished, we can get straight to the Arquillian setup.
+
+We'll first create a profile for testing on a running JBoss AS 7 instance on our own machine (here, the term *remote* refers to deployment protocol, not where the server is running).
+
+----
+$forge> setup arquillian --container JBOSS_AS_REMOTE_7.X
+----
+
+[NOTE]
+====
+At the time of writing, the plugin puts the Arquillian abbr:BOM[Bill of Materials] dependency in the wrong section. Move it into the dependencyManagement section below the others:
+
+.pom.xml
+----
+<dependencyManagement>
+  <dependencies>
+    <dependency>
+      <groupId>org.jboss.arquillian</groupId>
+      <artifactId>arquillian-bom</artifactId>
+      <version>1.0.0.Final</version>
+      <type>pom</type>
+      <scope>import</scope>
+    </dependency> 
+  </dependencies>
+</dependencyManagement>
+----
+
+You can also remove the version from the `arquillian-junit-container` dependency. Both of these problems will be fixed in the next release of the plugin.
+====
+
+We can also use the Forge Arquillian plugin to create tests for us. Let's create an integration test for one of the services created earlier:
+
+----
+$forge> arquillian create-test --class com.acme.sellmore.rest.ItemEndpoint --enableJPA
+----
+
+This test is going to read and write to a database. You probably don't want to mix test data with application data, so first copy the JPA descriptor (persistence.xml) to the test classpath and prefix the file with test- so it doesn't get mixed up:
+
+----
+$forge> cd ~~
+$forge> cp src/main/resources/META-INF/persistence.xml src/test/resources/test-persistence.xml
+----
+
+Make sure the 'test-persistence.xml' uses the ExampleDS datasource (or whatever you want to use for tests).
+
+Next, open up the test in your editor so we can work it into a useful test. Begin by updating the ShrinkWrap archive builder to snag the JPA descriptor from the test classpath (instead of the production one):
+
+.src/test/java/com/acme/sellmore/rest/ItemEndpointTest.java (fragment)
+----
+.addAsManifestResource("test-persistence.xml", "persistence.xml")
+----
+
+Assign the `@Test` method a meaninful name and replace the contents with logic to validate that an item can be created in one transaction and retrieved in another:
+
+.src/test/java/com/acme/sellmore/rest/ItemEndpointTest.java (fragment)
+----
+@Test
+public void should_insert_and_select_item() {
+    Item item = new Item();
+    item.setName("Widget");
+    item.setPrice(5.0);
+    item.setStock(100);
+    item = itemendpoint.create(item);
+    Long id = item.getId();
+    Assert.assertNotNull(id);
+    Assert.assertTrue(id > 0);
+    Assert.assertEquals(item.getVersion(), 0);
+    
+    item = itemendpoint.findById(id);
+    Assert.assertNotNull(item);
+    Assert.assertEquals("Widget", item.getName());
+}
+----
+
+The test is ready to run. First, start JBoss AS 7.
+
+----
+$> cd $JBOSS_HOME
+$> ./bin/standalone.sh
+----
+
+Run the Arquillian test on this instance by activating the cooresponding profile when running the Maven test command:
+
+----
+$forge> test --profile JBOSS_AS_REMOTE_7.X 
+----
+
+If things go we'll, the tests will pass and you'll see some Hibernate queries in the JBoss AS console. ``Green bar!''
+
+The previous test runs inside the container. Let's write another test that acts as a client to the REST endpoint. To keep effort to a minimum, we'll use the http://hc.apache.org/httpcomponents-client-ga[Apache HttpComponents HttpClient] library to invoke the HTTP endpoints. We can get Forge to add it to our build:
+
+----
+$forge> project add-dependency org.apache.httpcomponents:httpclient:4.1.2:test
+----
+
+=== Let's REST!
+
+Sigh. There's no better way to do this at the moment, so copy the previous test and rename it to `ItemEndpointClientTest` (rename both the file and the class name). Then, replace the class definition with the following source:
+
+.src/test/java/com/acme/sellmore/rest/ItemEndpointClientTest.java
+----
+@RunWith(Arquillian.class)
+public class ItemEndpointClientTest {
+    @ArquillianResource
+    private URL deploymentUrl;
+
+    @Deployment(testable = false)
+    public static WebArchive createDeployment() {
+        return ShrinkWrap.create(WebArchive.class, "test.war")
+                .addClasses(Item.class, ItemEndpoint.class)
+                .addAsResource("META-INF/persistence.xml")
+                .addAsWebInfResource(EmptyAsset.INSTANCE, "beans.xml")
+                .setWebXML(new File("src/main/webapp/WEB-INF/web.xml"));
+    }
+
+    @Test
+    public void should_post_update_and_get_item() {
+        DefaultHttpClient client = new DefaultHttpClient();
+        String itemResourceUrl = deploymentUrl + "rest/item";
+
+        String ITEM_XML = "<item>%1$s<name>Widget</name><price>5.0</price><stock>%3$d</stock>%1$s</item>";
+        
+        // POST new item
+        HttpPost post = new HttpPost(itemResourceUrl);
+        post.setEntity(createXmlEntity(String.format(ITEM_XML, "", "", 99)));
+        
+        String result = execute(post, client);
+        assertEquals(String.format(ITEM_XML, "<id>1</id>", "<version>0</version>", 99), result);
+
+        // PUT update to item 1
+        HttpPut put = new HttpPut(itemResourceUrl + "/1");
+        put.setEntity(createXmlEntity(String.format(ITEM_XML, "", "", 98)));
+        
+        execute(put, client);
+        
+        // GET item 1
+        HttpGet get = new HttpGet(itemResourceUrl + "/1");
+        get.setHeader("Accepts", MediaType.APPLICATION_XML);
+        
+        result = execute(get, client);
+        assertEquals(String.format(ITEM_XML, "<id>1</id>", "<version>1</version>", 98), result);
+        
+        client.getConnectionManager().shutdown();
+    }
+}
+----
+
+Also add these two private helper methods (to hide away some of the boilerplate code):
+
+.src/test/java/com/acme/sellmore/rest/ItemEndpointClientTest.java (fragment)
+----
+private HttpEntity createXmlEntity(final String xml) {
+    ContentProducer cp = new ContentProducer() {
+        public void writeTo(OutputStream outstream) throws IOException {
+            Writer writer = new OutputStreamWriter(outstream, "UTF-8");
+            writer.write(xml);
+            writer.flush();
+        }
+    };
+    
+    AbstractHttpEntity entity = new EntityTemplate(cp);
+    entity.setContentType(MediaType.APPLICATION_XML);
+    return entity;
+}
+
+private String execute(final HttpUriRequest request, final HttpClient client) {
+    try {
+        System.out.println(request.getMethod() + " " + request.getURI());
+        return client.execute(request, new BasicResponseHandler())
+                .replaceFirst("<\\?xml.*\\?>", "").trim();
+    }
+    catch (Exception e) {
+        e.printStackTrace();
+        Assert.fail(e.getMessage());
+        return null;
+    }
+    finally {
+        request.abort();
+    }
+}
+----
+
+Let's see if these endpoints do what they claim to do.
+
+----
+$forge> test --profile JBOSS_AS_REMOTE_7.X
+----
+
+If you get a test failure, it may be because the type the endpoints are configured to consume is incorrect. Open the `ItemEndpoint` class and replace all instances of `@Consumes` with:
+
+.src/main/java/com/acme/sellmore/rest/ItemEndpoint.java
+[listing]
+@Consumes(MediaType.APPLICATION_XML)
+
+Run the tests again. With any luck, this time you'll be chanting ``Green bar!''
+
+== Running the Arquillian tests on OpenShift
+
+Okay, now you can say it. "Let's take it to the cloud!" If they work there, they'll work anywhere :)
+
+It's up to you whether you want to run the tests on the same OpenShift application as the production application or whether you want to create a dedicated application. We'll assume you're going to create a dedicated application. Let's call it ike.
+
+[listing]
+$> rhc-create-app -t jbossas-7 -a ike
+
+You'll also need an Arquillian profile. The Forge plugin doesn't honor the OpenShift adapter yet, so you'll have splice this profile into the pom.xml by hand:
+
+.pom.xml (fragment)
+----
+<profile>
+  <id>OPENSHIFT_1.X</id>
+  <dependencies>
+    <dependency>
+      <groupId>org.jboss.arquillian.container</groupId>
+      <artifactId>arquillian-openshift-express</artifactId>
+      <version>1.0.0.Beta1</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</profile>
+----
+
+The Arquillian OpenShift adapter also uses git push to deploy the test archive. In order for that to work, it needs to know where it's pushing. In other words, it needs a little configuration.
+
+Seed an arquillian.xml descriptor using a known container (in this case, JBoss AS 7 remote):
+
+----
+$forge> arquillian configure-container --profile JBOSS_AS_REMOTE_7.X
+----
+
+Next, replace the container element with the following XML:
+
+.src/test/resources/arquillian.xml (fragment)
+----
+<container qualifier="OPENSHIFT_1.X">
+  <configuration>
+    <property name="namespace">mojavelinux</property>
+    <property name="application">ike</property>
+    <property name="sshUserName">02b0951a5ed54c98b54c41a7f2efbda8</property>
+    <!-- Passphrase can be specified using the environment variable SSH_PASSPHRASE -->
+    <!-- <property name="passphrase"></property> -->
+    <property name="login">dan.j.allen@gmail.com</property>
+  </configuration>
+</container>
+----
+
+You can either put the passphrase for your SSH key in the descriptor or you can export the `SSH_PASSPHRASE` environment variable:
+
+[listing]
+$> export SSH_PASSPHRASE=[libra_id_rsa passphrase]
+
+To activate this container configuration, write the name of the qualifier to the 'arquillian.launch' file (alternatively, you can select the configuration using the `-Darquillian.launch` flag when you run Maven):
+
+[listing]
+$> echo "OPENSHIFT_1.X" > src/test/resources/arquillian.launch
+
+Are you ready to see some tests run in the cloud?
+
+----
+$forge> test --profile OPENSHIFT_1.X
+----
+
+You may want to tail the log files in another terminal to moniter the progress:
+
+[listing]
+$> rhc-tail-files -a ike
+
+If you can't see the green bar, look above you :)
+
+= Hosting Configuration
+
+== Making your application a top-level domain
+
+Do we expect that you'll use *.rhcloud.com for all of your public websites? Of course not! That's where the alias feature comes in.
+
+You can create a domain alias for any OpenShift application using this command:
+
+[listing]
+$> rhc-ctl-app -a sellmore -c add-alias --alias sellmore.com
+
+Next, you point the DNS for your domain name to the IP address of your OpenShift server (or you can cheat by putting it in '/etc/hosts').
+
+Now you can access the application from the following URL:
+
+[role="text-info"]
+[icon-hand-right]#{empty}# +++http://sellmore.com+++
+
+Congratulations! You're OpenShift-hosted.
+
+= Summary
+
+In this tutorial, we learned how to: 
+
+* Register an account at OpenShift
+* Install the Ruby-based OpenShift client tools
+* Create our own OpenShift domain
+* Create an OpenShift application using the JBoss AS 7 cartridge on that domain
+* Add a remote OpenShift git repo to our own repo to deploy an existing app
+* Deploy a Java EE application to OpenShift
+* Work with the in-memory database
+* Configure H2 to persist the database file to the application's data directory
+* Configure MySQL and phpmyadmin cartridges in OpenShift
+* Configure our Java EE application to use the MySQL database running on the OpenShift domain
+
+= Resources
+
+* Git repository for this tutorial +
+  http://tinyurl.com/dcjbug-jboss-workshop
+* OpenShift homepage +
+  {openshift}
+* OpenShift dashboard +
+  {openshiftdashboard}
+* OpenShift Documentation +
+  http://docs.redhat.com/docs/en-US/OpenShift/2.0/html/User_Guide/index.html
+* OpenShift Knowledge Base +
+  https://redhat.com/openshift/community/kb
+* Installing OpenShift client tools on Linux, Windows and Mac OSX +
+  {installingclienttools}
+* Apps prepared for rapid deployment to OpenShift +
+  https://www.redhat.com/openshift/community/kb/kb-e1021-rundown-on-the-github-hosted-git-repositories-available-for-rapid-deployment
+* OpenShift resources for JBoss AS +
+  https://www.redhat.com/openshift/community/page/jboss-resources
+* JBoss Forge homepage: +
+  http://jboss.org/forge
+* JBoss AS 7 homepage: +
+  http://jboss.org/as7
+* JBoss Java EE quickstarts repository +
+  https://github.com/jbossas/quickstart
+* Deploy a Play! application on OpenShift (provided a lot of details for this workshop) +
+  https://github.com/opensas/play-demo/wiki/Step-12.5---deploy-to-openshift
+* How JBoss AS 7 was configured for OpenShift +
+  https://community.jboss.org/blogs/scott.stark/2011/08/10/jbossas7-configuration-in-openshift-express
+* OpenShift resources for JBoss AS +
+  https://www.redhat.com/openshift/community/page/jboss-resources
+* Apache HttpComponents HttpClient +
+  http://hc.apache.org/httpcomponents-client-ga
+
+////
+Create a parallel tutorial that takes a JBoss Tools-centric approach, as in: http://www.commonj.com/blogs/?p=677 and http://deors.wordpress.com/2011/12/13/red-hat-openshift/
+////
